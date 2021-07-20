@@ -9,7 +9,7 @@ import (
 
 func TestFizzBuzz0(t *testing.T) {
 	ret := mod1.FizzBuzz(0)
-	require.Empty(t,ret)
+	require.Empty(t, ret)
 }
 
 func TestFizzBuzz3(t *testing.T) {
