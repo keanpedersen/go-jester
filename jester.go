@@ -1,7 +1,10 @@
 package go_jester
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/keanpedersen/go-jester/jesters"
+	_ "github.com/keanpedersen/go-jester/jesters"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
@@ -27,37 +30,48 @@ func Path(path string) error {
 		return errors.WithStack(err)
 	}
 
-	// jest something
+	testFunc := func(position token.Pos, original string, jested string) {
+		passed, err := tryTests(path, fileSet, astDir)
+		if err != nil {
+			panic(err) // todo - bubble/log?
+		}
+		if passed {
+			// TODO: print source code line with pointers
+			pos := fileSet.Position(position)
+			fmt.Printf("File %v, Line %v, column %v", pos.Filename, pos.Line, pos.Column)
+			fmt.Printf(" - changing `%v` to `%v` has no test coverage\n", original, jested)
+		}
+	}
+
+	// jest away
 	for _, packages := range astDir {
 		for _, file := range packages.Files {
-
 			ast.Inspect(file, func(n ast.Node) bool {
-				ifStmt, ok := n.(*ast.IfStmt)
-				if !ok {
-					return true
+				for _, jester := range jesters.Jesters {
+					jester.Jest(n, testFunc)
 				}
-
-				binary, ok := ifStmt.Cond.(*ast.BinaryExpr)
-				if !ok {
-					return true
-				}
-
-				binary.Op = token.NEQ
-				// TODO: For each binary.Op, try to build a list of things that can be jestered.
-				// For each thing that can be jestered: Remember the old version, change it, save, run tests, and revert to the old version
-
 				return true
 			})
 
 		}
 	}
 
-	// Write out all files, ready for testing
-	for pkg, packages := range astDir {
+	// Rewrite the original source again at the end
+	return writeSource(fileSet, astDir)
+}
+
+func render(fset *token.FileSet, x interface{}) string {
+	var buf bytes.Buffer
+	if err := printer.Fprint(&buf, fset, x); err != nil {
+		panic(err)
+	}
+	return buf.String()
+}
+
+func writeSource(fileSet *token.FileSet, astDir map[string]*ast.Package) error {
+	for _, packages := range astDir {
 		// Print output
-		fmt.Printf("Package: %v\n", pkg)
 		for fileName, file := range packages.Files {
-			fmt.Printf("Filename: %v\n", fileName)
 
 			outFile, err := os.OpenFile(fileName, os.O_TRUNC|os.O_WRONLY, 0)
 			if err != nil {
@@ -73,15 +87,15 @@ func Path(path string) error {
 			}
 		}
 	}
+	return nil
+}
 
-	passed, err := runTests(path)
-	if err != nil {
-		return err
+func tryTests(path string, fileSet *token.FileSet, astDir map[string]*ast.Package) (passed bool, err error) {
+	if err := writeSource(fileSet, astDir); err != nil {
+		return passed, err
 	}
 
-	fmt.Printf("Passed: %v\n", passed)
-
-	return nil
+	return runTests(path)
 }
 
 func runTests(path string) (passed bool, err error) {
