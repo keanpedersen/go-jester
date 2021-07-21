@@ -1,10 +1,8 @@
 package go_jester
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/keanpedersen/go-jester/jesters"
-	_ "github.com/keanpedersen/go-jester/jesters"
 	"github.com/pkg/errors"
 	"go/ast"
 	"go/parser"
@@ -58,14 +56,6 @@ func Path(path string) error {
 
 	// Rewrite the original source again at the end
 	return writeSource(fileSet, astDir)
-}
-
-func render(fset *token.FileSet, x interface{}) string {
-	var buf bytes.Buffer
-	if err := printer.Fprint(&buf, fset, x); err != nil {
-		panic(err)
-	}
-	return buf.String()
 }
 
 func writeSource(fileSet *token.FileSet, astDir map[string]*ast.Package) error {
